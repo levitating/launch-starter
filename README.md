@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Launch Starter
 
-## Getting Started
+Clone → rename → ship. A production-ready Next.js template with auth, paywall, AI, and analytics pre-wired.
 
-First, run the development server:
+## Stack
+
+- **Next.js 15** (App Router, TypeScript, Tailwind, shadcn/ui)
+- **Supabase** — auth (email + Google OAuth) + Postgres
+- **Stripe** — subscription checkout + webhook entitlement
+- **Claude** (Anthropic) — server-side AI wrapper
+- **PostHog** — activation + conversion analytics
+
+## Ship Checklist
+
+### 1. Clone & install
+
+```bash
+git clone https://github.com/levitating/launch-starter my-app
+cd my-app
+npm install
+cp .env.example .env.local
+```
+
+### 2. Supabase
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Copy `SUPABASE_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY` into `.env.local`
+3. Run the migration: paste `supabase/migrations/001_initial.sql` into the Supabase SQL editor
+4. Enable Google OAuth: **Authentication → Providers → Google** (add client ID + secret)
+5. Set redirect URL: `https://your-domain.com/auth/callback`
+
+### 3. Stripe
+
+1. Create a product + recurring price in [Stripe dashboard](https://dashboard.stripe.com)
+2. Copy `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` into `.env.local`
+3. Wire the webhook: `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+4. Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`
+
+### 4. Anthropic
+
+Get an API key from [console.anthropic.com](https://console.anthropic.com) → paste into `ANTHROPIC_API_KEY`.
+
+### 5. PostHog
+
+Get a project key from [posthog.com](https://posthog.com) → paste into `NEXT_PUBLIC_POSTHOG_KEY`.
+
+### 6. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit `http://localhost:3000` → sign up → hit paywall → Stripe test checkout → AI feature unlocked.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 7. Deploy to Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+vercel --prod
+```
 
-## Learn More
+Add all env vars in the Vercel dashboard, set the Stripe webhook to your production URL.
 
-To learn more about Next.js, take a look at the following resources:
+## End-to-End Flow
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. User visits `/` → redirected to `/login`
+2. Signs up (email or Google) → lands on `/dashboard`
+3. No subscription → `<Paywall>` component shown → Stripe checkout
+4. Stripe webhook fires → `subscriptions` table updated
+5. Next visit to `/dashboard` → entitlement check passes → `<AiDemo>` shown
+6. AI prompt sent to `/api/ai/demo` → Claude responds
+7. All steps tracked in PostHog (`signed_up`, `paywall_viewed`, `checkout_started`, `subscription_activated`, `ai_feature_used`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Customization
 
-## Deploy on Vercel
+- **Rename** the app: update `metadata` in `src/app/layout.tsx`
+- **Swap AI model**: change `model` default in `src/lib/claude.ts`
+- **Add features**: extend `<AiDemo>` or add new protected routes under `/dashboard`
+- **Multi-tier pricing**: pass different `priceId` props to `<Paywall>`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Key Files
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| File | Purpose |
+|------|---------|
+| `src/lib/claude.ts` | Claude API wrapper |
+| `src/lib/stripe.ts` | Stripe helper + checkout session factory |
+| `src/lib/entitlements.ts` | Server-side entitlement check |
+| `src/lib/posthog.ts` | Client analytics + named events |
+| `src/components/Paywall.tsx` | Drop-in paywall component |
+| `src/app/api/stripe/webhook/route.ts` | Stripe → Supabase sync |
+| `supabase/migrations/001_initial.sql` | Initial schema |
