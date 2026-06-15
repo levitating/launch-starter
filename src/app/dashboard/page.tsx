@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { createClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/entitlements";
 import { redirect } from "next/navigation";
